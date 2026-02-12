@@ -1,0 +1,69 @@
+.weather-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 24px;
+    color: white;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.weather-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.weather-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.weather-source {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 12px;
+    border-radius: 12px;
+}
+
+.weather-main {
+    text-align: center;
+    margin: 20px 0;
+}
+
+.temperature {
+    font-size: 3.5rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.description {
+    font-size: 1.1rem;
+    text-transform: capitalize;
+    opacity: 0.9;
+}
+
+.weather-details {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.detail-item .label {
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+.detail-item .value {
+    font-size: 1.1rem;
+    font-weight: 600;
+}

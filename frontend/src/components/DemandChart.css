@@ -1,0 +1,20 @@
+.demand-chart {
+    background: #1e293b;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.demand-chart h3 {
+    margin: 0 0 16px 0;
+    color: #e2e8f0;
+    font-size: 1.2rem;
+}
+
+.demand-chart.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    color: #94a3b8;
+}
