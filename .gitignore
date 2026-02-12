@@ -21,4 +21,3 @@ yarn-error.log*
 # Editor
 .vscode/
 .idea/
-data/kaggle_data.csv
