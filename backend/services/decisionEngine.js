@@ -135,24 +135,51 @@ function makeDecision(surplusRisk, predictions, surplus, uncertainty = {}, weath
     const spoilageInfo = calculateSpoilageRisk(criticalItem, ambientTemp);
 
     // Choose action with minimum expected loss
+    // --- CASCADING SURPLUS VALUE EXTRACTION (CSVE) ---
+    // Calculate tiered value: Revenue -> Redistribution -> Buffer
+    const csveResult = calculateCSVE(surplusRisk, predictions, surplus, expectedCosts);
+
+    // Compare with other strategies
+    // We prioritize CSVE if it offers a balanced approach with revenue recovery AND social impact
+    // unless strictly cost-prohibitive (which is unlikely given revenue recovery)
+
+    // Default to normal
     let chosenAction = 'normal';
-    let minCost = expectedCosts.waste;
+    let maxNetValue = -expectedCosts.waste; // Baseline is negative cost of waste
 
-    if (expectedCosts.redistribute < minCost) {
+    // Value of Redistribution (Social Value - Cost)
+    const redistributeNetValue = -expectedCosts.redistribute;
+
+    // Value of Discount (Revenue Recaptured - Discount Loss) - simpler proxy:
+    // Actually expectedCosts.discount is just the LOSS.
+    // Revenue = TotalPotential - DiscountLoss.
+    // We need to compare "Benefit over Baseline".
+
+    // Let's use the explicit expected costs for comparison as before, but add CSVE
+    // CSVE Net Value = Revenue - TransportCost + SocialValue
+
+    // CSVE is usually superior because it captures revenue AND social value.
+    if (csveResult.netValue > redistributeNetValue && csveResult.netValue > -expectedCosts.waste) {
+        chosenAction = 'cascading';
+    } else if (expectedCosts.redistribute < expectedCosts.waste && expectedCosts.redistribute < expectedCosts.discount) {
         chosenAction = 'redistribute';
-        minCost = expectedCosts.redistribute;
-    }
-
-    if (expectedCosts.discount < minCost) {
+    } else if (expectedCosts.discount < expectedCosts.waste) {
         chosenAction = 'discount';
-        minCost = expectedCosts.discount;
     }
 
     // OVERRIDE: Critical Food Safety Risk
     // If heat stress is high, we MUST redistribute or freeze. 
     if (spoilageInfo.riskLevel === 'CRITICAL' || spoilageInfo.riskLevel === 'HIGH') {
-        if (chosenAction !== 'redistribute') {
-            chosenAction = 'redistribute';
+        if (chosenAction !== 'redistribute' && chosenAction !== 'cascading') {
+            // If CSVE can handle the risk (fast dispatch), keep it, otherwise fall back to pure redistribute
+            // For now, let's say CSVE allows for expedited redistribution of the donation tier.
+            // But if CRITICAL, maybe we skip the discount tier? 
+            // Let's force redistribute for CRITICAL to be safe, or allow CSVE if it has high redistribution.
+            if (spoilageInfo.riskLevel === 'CRITICAL') {
+                chosenAction = 'redistribute';
+            } else {
+                chosenAction = 'cascading'; // Try to sell some, donate rest quickly
+            }
         }
     }
 
@@ -173,11 +200,18 @@ function makeDecision(surplusRisk, predictions, surplus, uncertainty = {}, weath
             priorityScore: Math.round(priorityScore * 100) / 100,
             socialImpact: priorityScore > 0.5 ? 'High' : (priorityScore > 0.3 ? 'Medium' : 'Low')
         },
-        foodSafety: spoilageInfo
+        foodSafety: spoilageInfo,
+        csve: csveResult // Attach CSVE details
     };
 
     // Set action-specific details
-    if (chosenAction === 'redistribute') {
+    if (chosenAction === 'cascading') {
+        decision.actionLabel = 'Cascading Value Extraction';
+        decision.color = 'purple'; // Premium/Profit color
+        decision.reason = `CSVE Optimization: Recover ₹${csveResult.tiers.revenue.value} revenue + Donate ${csveResult.tiers.redistribution.count} meals.`;
+        decision.chosenStrategy = `Multi-tier approach maximizes economic & social returns.`;
+        decision.redistributionAmount = csveResult.tiers.redistribution.count;
+    } else if (chosenAction === 'redistribute') {
         decision.actionLabel = 'Redistribute to Shelter';
         decision.color = 'blue';
         decision.redistributionAmount = expectedCosts.details.redistributeAmount > 0 ? expectedCosts.details.redistributeAmount : 50;
@@ -222,7 +256,12 @@ function makeDecision(surplusRisk, predictions, surplus, uncertainty = {}, weath
 function generateRecommendations(decision, uncertaintyAdj) {
     const recs = [];
 
-    if (decision.action === 'redistribute') {
+    if (decision.action === 'cascading') {
+        recs.push(`💰 Revenue: Sell ${decision.csve.tiers.revenue.count} items @ 20% off`);
+        recs.push(`🚛 Redistribute: ${decision.csve.tiers.redistribution.count} meals (Pickup 2PM)`);
+        recs.push(`🛡️ Buffer: Keep ${decision.csve.tiers.buffer.count} items for late rush`);
+        recs.push(`Net Value: ₹${decision.csve.netValue} (vs ₹${-decision.expectedCosts.waste} if wasted)`);
+    } else if (decision.action === 'redistribute') {
         recs.push(`Contact shelter for immediate pickup of ${decision.redistributionAmount} meals`);
         recs.push(`Estimated social value: ₹${decision.redistributionAmount * COSTS.socialValue}`);
         if (decision.equityMetrics.priorityScore > 0.6) {
@@ -252,6 +291,66 @@ function resetShelter() {
     SHELTER.mealsProvided = 0;
     SHELTER.wasteReduced = 0;
     SHELTER.currentOccupancy = 65;
+}
+
+/**
+ * Calculate Cascading Surplus Value Extraction (CSVE)
+ * Tier 1: Revenue Recovery (Discount)
+ * Tier 2: Redistribution (Charity)
+ * Tier 3: Operational Buffer
+ */
+function calculateCSVE(surplusRisk, predictions, surplus, expectedCosts) {
+    // Total potential surplus items (approx based on risk)
+    const totalDemand = Object.values(predictions).reduce((a, b) => a + b, 0);
+    const estimatedSurplusItems = Math.round(totalDemand * surplusRisk);
+
+    // PARAMETERS
+    const REVENUE_CONVERSION_RATE = 0.40; // Sell 40% of surplus
+    const BUFFER_RATE = 0.10; // Keep 10%
+    const REDISTRIBUTION_RATE = 0.50; // Donate 50%
+    const DISCOUNT_PCT = 0.20; // 20% off
+
+    // Tier 1: Revenue Recovery
+    const revenueItems = Math.floor(estimatedSurplusItems * REVENUE_CONVERSION_RATE);
+    const discountedPrice = COSTS.avgMealPrice * (1 - DISCOUNT_PCT);
+    const revenueValue = revenueItems * discountedPrice;
+
+    // Tier 2: Redistribution
+    const redistributionItems = Math.floor(estimatedSurplusItems * REDISTRIBUTION_RATE);
+    const socialValue = redistributionItems * COSTS.socialValue;
+
+    // Tier 3: Buffer
+    const bufferItems = Math.max(0, estimatedSurplusItems - revenueItems - redistributionItems);
+
+    // Net Value Calculation
+    // Benefit: Revenue + Social Value + (Avoided Waste Cost on donated+sold items)
+    // Cost: Transport for donation
+    // Baseline is "Waste All" -> Pay disposal for all.
+    // Here we strictly calculate the "Active Value" generated.
+
+    const transportCost = redistributionItems > 0 ? COSTS.transportCost : 0;
+    const netValue = revenueValue + socialValue - transportCost;
+
+    return {
+        totalSurplus: estimatedSurplusItems,
+        netValue: Math.round(netValue),
+        tiers: {
+            revenue: {
+                count: revenueItems,
+                value: Math.round(revenueValue),
+                label: 'Flash Discount'
+            },
+            redistribution: {
+                count: redistributionItems,
+                value: Math.round(socialValue),
+                label: 'Shelter Commit'
+            },
+            buffer: {
+                count: bufferItems,
+                label: 'Safety Stock'
+            }
+        }
+    };
 }
 
 module.exports = {

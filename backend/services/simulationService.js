@@ -18,6 +18,7 @@ let simulationState = {
     totalWasteReduced: 0,
     totalMealsDonated: 0,
     totalRevenueLoss: 0,
+    totalRevenue: 0,
     inventory: { ...DEFAULT_INVENTORY },
     cookingFactor: 1.0,  // Adaptive cooking multiplier
     adaptationHistory: []
@@ -43,8 +44,9 @@ async function simulateDay(dayNumber, weather = null, eventFlag = 0, cookingFact
 
     // Predict demand
     const predictionResult = await predictDemand(features);
-    const predictions = predictionResult.predictions;
-    const uncertainty = predictionResult.uncertainty;
+    // Use Daily Predictions if available for simulation scale, otherwise fallback to hourly
+    const predictions = predictionResult.daily_predictions || predictionResult.predictions;
+    const uncertainty = predictionResult.daily_uncertainty || predictionResult.uncertainty;
 
     // Apply adaptive cooking factor
     const appliedCookingFactor = cookingFactor !== null ? cookingFactor : simulationState.cookingFactor;
@@ -142,7 +144,7 @@ async function simulateDay(dayNumber, weather = null, eventFlag = 0, cookingFact
         actualDemand,
         predictionError: Math.round(predictionError * 10) / 10,
         cookingFactor: Math.round(appliedCookingFactor * 100) / 100,
-        surplusRisk,
+        surplusRisk: Math.round(surplusRisk * 10000) / 100, // Scale to percentage for frontend
         decision,
         metricsSnapshot: {
             wasteReduced: Math.round(simulationState.totalWasteReduced * 10) / 10,
@@ -243,6 +245,7 @@ function resetSimulation() {
         totalWasteReduced: 0,
         totalMealsDonated: 0,
         totalRevenueLoss: 0,
+        totalRevenue: 0,
         inventory: { ...DEFAULT_INVENTORY },
         cookingFactor: 1.0,
         adaptationHistory: []

@@ -47,13 +47,16 @@ app.post('/api/predict', async (req, res) => {
         }
 
         const predictions = await predictDemand(features);
-
         // Add surplus calculation
-        const ingredientUsage = computeIngredientUsage(predictions.predictions);
+        // Use Daily Predictions for accurate risk assessment (inventory is daily scale)
+        const dailyPreds = predictions.daily_predictions || predictions.predictions;
+        const ingredientUsage = computeIngredientUsage(dailyPreds);
         const surplus = computeSurplus(ingredientUsage);
-        const surplusRisk = computeSurplusRisk(surplus);
+        const surplusRiskRaw = computeSurplusRisk(surplus); // 0-1 ratio
         const weather = { temperature: features.temperature, rainfall: features.rainfall };
-        const decision = makeDecision(surplusRisk, predictions.predictions, surplus, predictions.uncertainty, weather, features.event_flag);
+
+        // Pass daily predictions and raw risk (0-1) to decision engine
+        const decision = makeDecision(surplusRiskRaw, dailyPreds, surplus, predictions.daily_uncertainty || predictions.uncertainty, weather, features.event_flag);
 
         res.json({
             success: true,
@@ -61,7 +64,7 @@ app.post('/api/predict', async (req, res) => {
                 ...predictions,
                 ingredientUsage,
                 surplus,
-                surplusRisk,
+                surplusRisk: Math.round(surplusRiskRaw * 10000) / 100, // Convert to percentage for frontend (0-100)
                 decision
             }
         });

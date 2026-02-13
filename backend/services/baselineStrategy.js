@@ -20,6 +20,7 @@ class BaselineStrategy {
         this.inventory = { ...DEFAULT_INVENTORY };
         this.totalWaste = 0;
         this.totalRevenueLoss = 0;
+        this.totalRevenue = 0;
         this.days = [];
     }
 
@@ -41,7 +42,7 @@ class BaselineStrategy {
             dayWaste += itemWaste * 0.1; // kg
         }
 
-        this.totalWaste += dayWaste;
+        // Waste accumulated in the block below (line ~60)
 
         // Baseline has NO redistribution (all waste goes to trash)
         // Baseline has NO discounting (fixed pricing)

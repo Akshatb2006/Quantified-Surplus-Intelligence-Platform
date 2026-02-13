@@ -46,8 +46,17 @@ function calculateSpoilageRisk(ingredient, ambientTemp) {
     // Check Danger Zone: 5°C to 60°C
     const isDangerZone = ambientTemp >= TEMP_ZONES.DANGER_MIN && ambientTemp <= TEMP_ZONES.DANGER_MAX;
 
+    // Estimate frozen food temperature based on ambient temperature
+    // Assuming a standard freezer target of -18°C with thermal ingress factor
+    let estimatedFrozenTemp = -18;
+    if (ambientTemp > -18) {
+        estimatedFrozenTemp += (ambientTemp + 18) * 0.1; // 10% thermal exposure factor
+    }
+    estimatedFrozenTemp = Math.round(estimatedFrozenTemp * 10) / 10;
+
     return {
         ambientTemp,
+        estimatedFrozenTemp,
         originalHours: baseHours,
         effectiveHours,
         stressIndex,

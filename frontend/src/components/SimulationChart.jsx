@@ -1,51 +1,70 @@
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import './SimulationChart.css';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 function SimulationChart({ simulationData }) {
     if (!simulationData || simulationData.length === 0) {
-        return <div className="simulation-chart loading">Run simulation to see trends...</div>;
+        return (
+            <div className="bg-card border border-border rounded-xl p-6 h-full flex flex-col items-center justify-center min-h-[300px] text-muted-foreground text-center">
+                <div className="mb-2">Run a simulation to see the sustainability impact analysis</div>
+                <div className="text-sm opacity-50">Adjust parameters and click "Run Simulation"</div>
+            </div>
+        );
     }
 
     return (
-        <div className="simulation-chart">
-            <h3>📈 Multi-Day Simulation</h3>
-            <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={simulationData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <XAxis
-                        dataKey="day"
-                        stroke="#94a3b8"
-                        label={{ value: 'Day', position: 'insideBottom', offset: -5, fill: '#94a3b8' }}
-                    />
-                    <YAxis stroke="#94a3b8" />
-                    <Tooltip
-                        contentStyle={{
-                            backgroundColor: '#1e293b',
-                            border: '1px solid #334155',
-                            borderRadius: '8px',
-                            color: '#e2e8f0'
-                        }}
-                    />
-                    <Legend />
-                    <Line
-                        type="monotone"
-                        dataKey="surplusRisk"
-                        stroke="#ef4444"
-                        strokeWidth={3}
-                        dot={{ r: 4 }}
-                        activeDot={{ r: 6 }}
-                        name="Surplus Risk"
-                    />
-                    <Line
-                        type="monotone"
-                        dataKey="totalDemand"
-                        stroke="#3b82f6"
-                        strokeWidth={3}
-                        dot={{ r: 4 }}
-                        activeDot={{ r: 6 }}
-                        name="Total Demand"
-                    />
-                </LineChart>
-            </ResponsiveContainer>
+        <div className="bg-card border border-border rounded-xl p-6 h-full">
+            <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                <span>📊</span> Simulation Results
+            </h3>
+
+            <div className="h-[300px] w-full min-h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                        data={simulationData.map(d => ({
+                            ...d,
+                            totalDemand: Number(d.totalDemand),
+                            surplusRisk: Number(d.surplusRisk)
+                        }))}
+                        margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted))" />
+                        <XAxis
+                            dataKey="day"
+                            label={{ value: 'Day', position: 'insideBottomRight', offset: -5, fill: 'hsl(var(--muted-foreground))' }}
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={12}
+                            tickLine={false}
+                            axisLine={false}
+                        />
+                        <YAxis
+                            yAxisId="left"
+                            orientation="left"
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={12}
+                            tickLine={false}
+                            axisLine={false}
+                        />
+                        <YAxis
+                            yAxisId="right"
+                            orientation="right"
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={12}
+                            tickLine={false}
+                            axisLine={false}
+                        />
+                        <Tooltip
+                            cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
+                            contentStyle={{
+                                backgroundColor: 'hsl(var(--popover))',
+                                borderColor: 'hsl(var(--border))',
+                                borderRadius: '8px'
+                            }}
+                        />
+                        <Legend />
+                        <Bar dataKey="totalDemand" name="Total Demand" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} yAxisId="left" />
+                        <Bar dataKey="surplusRisk" name="Surplus Risk Index" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} yAxisId="right" />
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
         </div>
     );
 }

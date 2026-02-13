@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import './App.css';
+import { motion } from 'framer-motion';
+import './App.css'; // Keep for resets if any, though mostly empty
 import { api } from './services/api';
+import Layout from './components/Layout';
 import WeatherCard from './components/WeatherCard';
 import DemandChart from './components/DemandChart';
 import SurplusGauge from './components/SurplusGauge';
@@ -8,6 +10,7 @@ import DecisionPanel from './components/DecisionPanel';
 import MetricsCards from './components/MetricsCards';
 import SimulationChart from './components/SimulationChart';
 import ComparisonTable from './components/ComparisonTable';
+import { Settings2, Play, RefreshCw, MapPin, Calendar, BarChart3 } from 'lucide-react';
 
 function App() {
   const [weather, setWeather] = useState(null);
@@ -44,10 +47,8 @@ function App() {
   }
 
   async function fetchPrediction(weatherData) {
-    // Handle case where weatherData is an event or undefined
     const w = (weatherData && weatherData.temperature !== undefined) ? weatherData : weather;
     if (!w || w.temperature === undefined) {
-      console.warn("Prediction skipped: Missing temperature data", w);
       return;
     }
 
@@ -75,20 +76,43 @@ function App() {
     setLoading(true);
     try {
       const results = await api.runSimulation(simulationDays, []);
-      // Extract days array and transform for chart
       if (results.days && Array.isArray(results.days)) {
         const chartData = results.days.map(day => ({
-          day: day.day + 1, // Make 1-indexed for display
-          surplusRisk: Math.round(day.surplusRisk * 100) / 100,
-          totalDemand: Object.values(day.predictions || {}).reduce((sum, val) => sum + val, 0)
+          day: day.day + 1,
+          surplusRisk: Math.round(Number(day.surplusRisk) * 100) / 100, // Already a percentage from backend
+          totalDemand: Object.values(day.predictions || {}).reduce((sum, val) => sum + Number(val), 0)
         }));
         setSimulationData(chartData);
       }
 
-      // Extract comparison data
       if (results.summary && results.summary.comparison) {
-        setComparison(results.summary.comparison);
-        setBaselineMetrics(results.summary.baseline);
+        const comp = results.summary.comparison;
+        const ai = results.summary.ai || {};
+        const bl = results.summary.baseline || {};
+
+        // Map to field names ComparisonTable expects
+        // ComparisonTable expects: comparison.waste (% change), comparison.cost (% change), comparison.revenue (% change)
+        // and baselineMetrics.waste, baselineMetrics.cost, baselineMetrics.revenue (absolute values)
+        const wastePercent = bl.totalWasteKg > 0
+          ? -((comp.wasteReductionKg / bl.totalWasteKg) * 100)
+          : 0; // Negative = reduction (good, since inverse=true)
+        const revenuePercent = bl.totalRevenue > 0
+          ? ((ai.totalRevenue - bl.totalRevenue) / bl.totalRevenue) * 100
+          : 0;
+        const costPercent = bl.revenueLoss > 0
+          ? -(((ai.revenueLoss || 0) - (bl.revenueLoss || 0)) / Math.max(bl.revenueLoss, 1)) * 100
+          : 0;
+
+        setComparison({
+          waste: Math.round(wastePercent * 10) / 10,
+          cost: Math.round(costPercent * 10) / 10,
+          revenue: Math.round(revenuePercent * 10) / 10
+        });
+        setBaselineMetrics({
+          waste: bl.totalWasteKg || 0,
+          cost: bl.revenueLoss || 0,
+          revenue: bl.totalRevenue || 0
+        });
       }
 
       await loadMetrics();
@@ -102,7 +126,6 @@ function App() {
   async function loadMetrics() {
     try {
       const metricsData = await api.getMetrics();
-      // Transform metrics for display
       const transformedMetrics = {
         carbonSaved: metricsData.metrics?.carbonSavedKg || 0,
         foodSaved: metricsData.metrics?.wasteReductionKg || 0,
@@ -125,28 +148,49 @@ function App() {
     }
   }
 
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const item = {
+    hidden: { y: 20, opacity: 0 },
+    show: { y: 0, opacity: 1 }
+  };
+
   return (
-    <div className="app">
-      <div className="sidebar">
-        <div className="logo">
-          <h1>🌍 Food Surplus AI</h1>
-          <p>Predictive Redistribution System</p>
+    <Layout>
+      <motion.div
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="bg-card border border-border rounded-xl p-6 mb-8 shadow-sm"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Settings2 className="w-5 h-5 text-primary" />
+          <h2 className="text-lg font-semibold text-foreground">Simulation Controls</h2>
         </div>
 
-        <div className="controls">
-          <div className="control-group">
-            <label>Select Restaurant</label>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <MapPin size={14} /> Restaurant Location
+            </label>
             <select
+              className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all"
               value={city === 'Delhi' ? 'Rest-A' : (city === 'Mumbai' ? 'Rest-B' : 'Rest-A')}
               onChange={(e) => {
-                // Fake restaurant switch by just re-running
                 setLoading(true);
                 setTimeout(() => {
                   runSimulation();
                   setLoading(false);
                 }, 500);
               }}
-              style={{ width: '100%', padding: '8px', borderRadius: '4px', background: '#334155', color: 'white', border: '1px solid #475569' }}
             >
               <option value="Rest-A">🍔 Burger King (Connaught Place)</option>
               <option value="Rest-B">🍕 Domino's (Hauz Khas)</option>
@@ -154,10 +198,13 @@ function App() {
             </select>
           </div>
 
-          <div className="control-group">
-            <label>City</label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <MapPin size={14} /> City Override
+            </label>
             <input
               type="text"
+              className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all"
               value={city}
               onChange={(e) => setCity(e.target.value)}
               onBlur={handleCityChange}
@@ -165,86 +212,109 @@ function App() {
             />
           </div>
 
-          <div className="control-group">
-            <label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Calendar size={14} /> Simulation Horizon
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                className="flex-1 accent-primary h-2 bg-secondary rounded-lg appearance-none cursor-pointer"
+                min="3"
+                max="14"
+                value={simulationDays}
+                onChange={(e) => setSimulationDays(parseInt(e.target.value))}
+              />
+              <span className="text-sm font-bold w-8">{simulationDays}d</span>
+            </div>
+          </div>
+
+          <div className="flex items-end gap-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground cursor-pointer bg-secondary/50 px-3 py-2 rounded-md hover:bg-secondary transition-colors h-[40px] flex-1 justify-center border border-border">
               <input
                 type="checkbox"
+                className="accent-primary w-4 h-4"
                 checked={eventFlag === 1}
                 onChange={(e) => setEventFlag(e.target.checked ? 1 : 0)}
               />
-              Special Event Today
+              Special Event Effect
             </label>
           </div>
+        </div>
 
-          <div className="control-group">
-            <label>Simulation Days: {simulationDays}</label>
-            <input
-              type="range"
-              min="3"
-              max="14"
-              value={simulationDays}
-              onChange={(e) => setSimulationDays(parseInt(e.target.value))}
-            />
-          </div>
-
+        <div className="flex gap-4 mt-6 pt-4 border-t border-border/50">
           <button
-            className="btn-primary"
+            className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-lg hover:bg-primary/90 transition-all shadow-lg shadow-primary/25 font-medium disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95"
             onClick={runSimulation}
             disabled={loading}
           >
-            {loading ? '⏳ Running...' : '🚀 Run Simulation'}
+            {loading ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" /> Running Simulation...
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4" /> Run Simulation
+              </>
+            )}
           </button>
 
           <button
-            className="btn-secondary"
+            className="flex items-center gap-2 bg-secondary text-secondary-foreground px-4 py-2.5 rounded-lg hover:bg-secondary/80 transition-all font-medium border border-border"
             onClick={() => fetchPrediction()}
           >
-            🔄 Refresh Prediction
+            <RefreshCw className="w-4 h-4" /> Refresh Prediction
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="main-content">
-        <div className="dashboard-grid">
-          <div className="grid-item span-2">
-            <WeatherCard weather={weather} />
-          </div>
+      <motion.div
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+      >
+        <motion.div variants={item} className="col-span-1 md:col-span-2 lg:col-span-1">
+          <WeatherCard weather={weather} />
+        </motion.div>
 
-          <div className="grid-item span-2">
-            <SurplusGauge surplusRisk={prediction?.surplusRisk} />
-          </div>
+        <motion.div variants={item} className="col-span-1 md:col-span-2 lg:col-span-1">
+          <SurplusGauge surplusRisk={prediction?.surplusRisk} />
+        </motion.div>
 
-          <div className="grid-item span-4">
+        <motion.div variants={item} className="col-span-1 md:col-span-4 lg:col-span-2">
+          <MetricsCards metrics={metrics} />
+        </motion.div>
+
+        <motion.div variants={item} className="col-span-1 md:col-span-4 lg:col-span-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
             <DemandChart
+              forecast={prediction?.hourly_forecast}
               predictions={prediction?.predictions}
               uncertainty={prediction?.uncertainty}
               lowerBound={prediction?.lower_bound}
               upperBound={prediction?.upper_bound}
             />
-          </div>
-
-          <div className="grid-item span-4">
             <DecisionPanel decision={prediction?.decision} />
           </div>
+        </motion.div>
 
-          <div className="grid-item span-4">
-            <MetricsCards metrics={metrics} />
-          </div>
-
-          <div className="grid-item span-4">
+        <motion.div variants={item} className="col-span-1 md:col-span-4 border-t border-border pt-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-primary" />
+            Performance Analysis
+          </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <SimulationChart simulationData={simulationData} />
-          </div>
-
-          <div className="grid-item span-4">
             <ComparisonTable
               comparison={comparison}
               baselineMetrics={baselineMetrics}
               aiMetrics={metrics}
             />
           </div>
-        </div>
-      </div>
-    </div>
+        </motion.div>
+      </motion.div>
+    </Layout>
   );
 }
 
