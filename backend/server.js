@@ -69,6 +69,7 @@ app.post('/api/predict', async (req, res) => {
             }
         });
     } catch (error) {
+        console.error('Error in /api/predict:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -80,6 +81,7 @@ app.post('/api/simulate-day', async (req, res) => {
         const result = await simulateDay(day, null, eventFlag);
         res.json({ success: true, data: result });
     } catch (error) {
+        console.error('Error in /api/simulate-day:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -91,6 +93,7 @@ app.post('/api/simulate', async (req, res) => {
         const results = await runSimulation(days, eventDays);
         res.json({ success: true, data: results });
     } catch (error) {
+        console.error('Error in /api/simulate:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -102,6 +105,7 @@ app.get('/api/metrics', (req, res) => {
         const shelter = getShelterStatus();
         res.json({ success: true, data: { metrics, shelter } });
     } catch (error) {
+        console.error('Error in /api/metrics:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -112,6 +116,7 @@ app.post('/api/reset', (req, res) => {
         resetSimulation();
         res.json({ success: true, message: 'Simulation reset successfully' });
     } catch (error) {
+        console.error('Error in /api/reset:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
