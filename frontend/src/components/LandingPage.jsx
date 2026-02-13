@@ -59,7 +59,7 @@ function LandingPage({ onStart }) {
                         <span className="text-4xl">🍔</span>
                     </div>
                     <h1 className="text-5xl md:text-6xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-emerald-400">
-                        Intelligent Supply Chain
+                        Resurge AI
                     </h1>
                     <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                         AI-driven demand forecasting and surplus management for sustainable food businesses.

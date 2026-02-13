@@ -31,7 +31,7 @@ const Layout = ({ children }) => {
                     <div className="w-8 h-8 bg-primary rounded-lg mr-3 flex items-center justify-center shadow-lg shadow-primary/20">
                         <span className="text-primary-foreground font-bold">M</span>
                     </div>
-                    <h1 className="text-xl font-bold tracking-tight">Mesa AI</h1>
+                    <h1 className="text-xl font-bold tracking-tight">Resurge AI</h1>
                 </div>
 
                 <nav className="flex-1">
